@@ -4,6 +4,12 @@ A Streamlit app that uses a real trained **Random Forest** model to predict whet
 
 Pick a real customer from the dataset, tweak their age, spend, usage, or contact recency with plain sliders, and watch the model's prediction and confidence update instantly. No mock data, no dummy logic — every prediction comes from `random_forest_health_model.pkl` running live.
 
+
+## Live Demo
+
+(https://customer-retention-classification-8abnwgbr4r6sndzdiwo7wc.streamlit.app/)
+
+
 ## Features
 
 - **Live AI verdict** — Healthy / At Risk / Churned, with a real confidence score from the model (not a hardcoded number)
@@ -50,10 +56,6 @@ streamlit run App.py
 ```
 
 The app opens at `http://localhost:8501`.
-
-## Live Demo
-
-[Add your Streamlit Community Cloud link here once deployed]
 
 ## Notes
 
