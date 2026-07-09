@@ -13,7 +13,6 @@ Browse real customers from the dataset and see exactly how the AI reads each one
 ## Features
 
 - **Live AI verdict** — Healthy / At Risk / Churned, with a real confidence score from the model (not a hardcoded number)
-- **Read-only by design** — no editable controls; this is for looking at what the model sees on real customers, not simulating hypothetical ones
 - **Recommended action** — a simple rule-based suggestion (e.g. "Billing Grace Period Outreach") based on the customer's info
 - **What the AI looks at most** — a breakdown of which signals the model relies on most heavily, in plain English
 - **Grounded in real data** — customers are sampled directly from the training dataset, not synthetically generated
