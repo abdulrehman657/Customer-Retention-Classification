@@ -1,8 +1,8 @@
 # 🔎 Customer Health Checker
 
-A Streamlit app that uses a real trained **Random Forest** model to predict whether a customer is **Healthy**, **At Risk**, or **Churned** — and lets you adjust a customer's info live to see how the AI's verdict changes.
+A Streamlit app that uses a real trained **Random Forest** model to predict whether a customer is **Healthy**, **At Risk**, or **Churned**.
 
-Pick a real customer from the dataset, tweak their age, spend, usage, or contact recency with plain sliders, and watch the model's prediction and confidence update instantly. No mock data, no dummy logic — every prediction comes from `random_forest_health_model.pkl` running live.
+Browse real customers from the dataset and see exactly how the AI reads each one — a live verdict, a confidence score, and a recommended action, all computed from the actual trained model. No mock data, no dummy logic — every prediction comes from `random_forest_health_model.pkl` running live.
 
 
 ## Live Demo
@@ -13,7 +13,7 @@ Pick a real customer from the dataset, tweak their age, spend, usage, or contact
 ## Features
 
 - **Live AI verdict** — Healthy / At Risk / Churned, with a real confidence score from the model (not a hardcoded number)
-- **Plain-language controls** — every slider uses real units (age in years, spend in dollars, days since contact) instead of confusing abstract multipliers
+- **Read-only by design** — no editable controls; this is for looking at what the model sees on real customers, not simulating hypothetical ones
 - **Recommended action** — a simple rule-based suggestion (e.g. "Billing Grace Period Outreach") based on the customer's info
 - **What the AI looks at most** — a breakdown of which signals the model relies on most heavily, in plain English
 - **Grounded in real data** — customers are sampled directly from the training dataset, not synthetically generated
@@ -22,7 +22,7 @@ Pick a real customer from the dataset, tweak their age, spend, usage, or contact
 
 1. `Model-Training/Model-Training.py` trains a `RandomForestClassifier` (scikit-learn) on `balanced_customer_health_dataset.csv` and saves it to `Model-Training/random_forest_health_model.pkl`.
 2. `Front-End/App.py` loads that trained model and a sample of 140 real customers.
-3. Editing a customer's info in the UI recomputes their engineered features (spend rate, lifecycle ratio, etc.) using the same formulas as the dataset, then calls `model.predict()` / `model.predict_proba()` live — every verdict shown is a genuine model output.
+3. Picking a customer calls `model.predict()` / `model.predict_proba()` live on their real data — every verdict shown is a genuine model output, not a lookup or a hardcoded value.
 
 ## Tech Stack
 
