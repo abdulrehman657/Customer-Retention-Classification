@@ -14,8 +14,8 @@ Pick a real customer from the dataset, tweak their age, spend, usage, or contact
 
 ## How It Works
 
-1. `Model Training/Model-Training.py` trains a `RandomForestClassifier` (scikit-learn) on `balanced_customer_health_dataset.csv` and saves it to `Model Training/random_forest_health_model.pkl`.
-2. `Front End/App.py` loads that trained model and a sample of 140 real customers.
+1. `Model-Training/Model-Training.py` trains a `RandomForestClassifier` (scikit-learn) on `balanced_customer_health_dataset.csv` and saves it to `Model-Training/random_forest_health_model.pkl`.
+2. `Front-End/App.py` loads that trained model and a sample of 140 real customers.
 3. Editing a customer's info in the UI recomputes their engineered features (spend rate, lifecycle ratio, etc.) using the same formulas as the dataset, then calls `model.predict()` / `model.predict_proba()` live — every verdict shown is a genuine model output.
 
 ## Tech Stack
@@ -30,21 +30,21 @@ Pick a real customer from the dataset, tweak their age, spend, usage, or contact
 ```
 ├── README.md
 ├── .streamlit/config.toml                       # App theme
-├── Model Training/
+├── Model-Training/
 │   ├── Model-Training.py                        # Trains and saves the Random Forest model
 │   └── random_forest_health_model.pkl           # Trained model (compressed)
-└── Front End/
+└── Front-End/
     ├── App.py                                   # Streamlit app (UI + live inference)
     ├── balanced_customer_health_dataset.csv     # Customer sample source
     └── requirements.txt                         # Python dependencies
 ```
 
-`Front End/App.py` locates the model in the sibling `Model Training/` folder automatically (resolved relative to its own file location), so it works regardless of which directory you launch it from.
+`Front-End/App.py` locates the model in the sibling `Model-Training/` folder automatically (resolved relative to its own file location), so it works regardless of which directory you launch it from.
 
 ## Running Locally
 
 ```bash
-cd "Front End"
+cd "Front-End"
 pip install -r requirements.txt
 streamlit run App.py
 ```

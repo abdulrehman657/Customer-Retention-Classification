@@ -35,9 +35,12 @@ st.set_page_config(
 # Resolved relative to this file (not the working directory) so the app
 # finds its files no matter where `streamlit run` is invoked from - this
 # folder holds App.py, the CSV, and requirements.txt; the model lives one
-# level up in the sibling "Model Training" folder.
+# level up in the sibling "Model-Training" folder. Folder names are
+# hyphenated, not spaced - a space in "Front End" broke Streamlit Community
+# Cloud's requirements.txt path resolution (it silently truncated the path
+# at the space), so spaces are avoided entirely here.
 APP_DIR = Path(__file__).resolve().parent
-MODEL_PATH = APP_DIR.parent / "Model Training" / "random_forest_health_model.pkl"
+MODEL_PATH = APP_DIR.parent / "Model-Training" / "random_forest_health_model.pkl"
 DATA_PATH = APP_DIR / "balanced_customer_health_dataset.csv"
 POPULATION_SIZE = 140
 POPULATION_SEED = 42
