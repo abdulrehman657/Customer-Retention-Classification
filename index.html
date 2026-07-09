@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-background">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090d16" />
+    <title>Retention Simulator · Random Forest Class-Drift Analytics</title>
+    <meta
+      name="description"
+      content="A dark FinTech ML dashboard simulating customer churn risk with a mock Random Forest, live behavioral levers, and priority retention actions."
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              mono: ['Geist Mono', 'ui-monospace', 'monospace'],
+            },
+            colors: {
+              background: 'var(--background)',
+              foreground: 'var(--foreground)',
+              muted: { foreground: 'var(--muted-foreground)' },
+              emerald: 'var(--emerald)',
+              amber: 'var(--amber)',
+              crimson: 'var(--crimson)',
+              neon: 'var(--neon)',
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #090d16;
+        --foreground: oklch(0.96 0.01 240);
+        --muted-foreground: oklch(0.65 0.02 240);
+        --emerald: oklch(0.75 0.16 160);
+        --amber: oklch(0.82 0.15 80);
+        --crimson: oklch(0.66 0.22 18);
+        --neon: oklch(0.78 0.14 210);
+        --glass-border: oklch(0.75 0.06 235 / 14%);
+      }
+
+      body {
+        background-color: var(--background);
+        color: var(--foreground);
+        font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .font-mono {
+        font-family: 'Geist Mono', ui-monospace, monospace;
+      }
+
+      .glass-card {
+        background: linear-gradient(
+          160deg,
+          oklch(0.26 0.03 250 / 55%),
+          oklch(0.16 0.03 250 / 45%)
+        );
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--glass-border);
+      }
+
+      /* Precision range slider */
+      input[type='range'].lever {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 6px;
+        border-radius: 9999px;
+        background: transparent;
+        cursor: pointer;
+      }
+      input[type='range'].lever::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 9999px;
+      }
+      input[type='range'].lever::-moz-range-track {
+        height: 6px;
+        border-radius: 9999px;
+      }
+      input[type='range'].lever::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        margin-top: -7px;
+        width: 20px;
+        height: 20px;
+        border-radius: 9999px;
+        background: oklch(0.98 0.01 240);
+        border: 3px solid var(--slider-accent, var(--neon));
+        box-shadow: 0 0 0 4px oklch(0.72 0.15 220 / 18%),
+          0 2px 8px rgb(0 0 0 / 40%);
+        transition: box-shadow 0.15s ease, transform 0.15s ease;
+      }
+      input[type='range'].lever::-webkit-slider-thumb:hover {
+        transform: scale(1.12);
+      }
+      input[type='range'].lever::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 9999px;
+        background: oklch(0.98 0.01 240);
+        border: 3px solid var(--slider-accent, var(--neon));
+        box-shadow: 0 0 0 4px oklch(0.72 0.15 220 / 18%),
+          0 2px 8px rgb(0 0 0 / 40%);
+      }
+
+      .ring-emerald {
+        box-shadow: 0 0 0 1px oklch(0.75 0.16 160 / 25%),
+          0 0 28px -6px oklch(0.75 0.16 160 / 40%);
+      }
+      .ring-amber {
+        box-shadow: 0 0 0 1px oklch(0.82 0.15 80 / 28%),
+          0 0 32px -4px oklch(0.82 0.15 80 / 45%);
+      }
+      .ring-crimson {
+        box-shadow: 0 0 0 1px oklch(0.66 0.22 18 / 30%),
+          0 0 32px -4px oklch(0.66 0.22 18 / 50%);
+      }
+      .btn-neon {
+        box-shadow: 0 0 24px -4px var(--neon);
+      }
+
+      ::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: oklch(0.5 0.03 250 / 40%);
+        border-radius: 9999px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="mx-auto min-h-screen w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <!-- Header -->
+      <header
+        class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div class="flex items-center gap-3">
+          <span
+            class="grid h-11 w-11 place-items-center rounded-xl text-neon ring-1"
+            style="background: oklch(0.78 0.14 210 / 12%); --tw-ring-color: oklch(0.78 0.14 210 / 30%);"
+          >
+            <!-- cpu icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="6" height="6" />
+              <path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" />
+            </svg>
+          </span>
+          <div>
+            <h1
+              class="text-lg font-semibold tracking-tight text-foreground text-balance"
+            >
+              Retention Simulator
+            </h1>
+            <p class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span id="status-dot" class="h-1.5 w-1.5 rounded-full"></span>
+              Random Forest · Class-Drift ML Analytics
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="reset-btn"
+            type="button"
+            class="hidden items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
+            style="border-color: oklch(1 0 0 / 10%); background: oklch(1 0 0 / 5%); color: oklch(0.96 0.01 240 / 80%);"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            Reset
+          </button>
+          <button
+            id="simulate-btn"
+            type="button"
+            class="btn-neon inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+            style="background: var(--neon); color: #090d16;"
+          >
+            <span id="simulate-btn-content" class="inline-flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="6 3 20 12 6 21 6 3" />
+              </svg>
+              Simulate Impact
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div class="relative flex flex-col gap-4">
+        <!-- Processing overlay -->
+        <div
+          id="processing-overlay"
+          class="absolute inset-0 z-20 hidden place-items-center rounded-2xl backdrop-blur-sm"
+          style="background: oklch(0.14 0.02 250 / 60%);"
+        >
+          <div
+            class="glass-card flex flex-col items-center gap-3 rounded-2xl px-8 py-6"
+          >
+            <div class="relative">
+              <svg class="h-8 w-8 animate-spin" style="color: var(--neon);" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <svg class="absolute -right-1 -top-1 h-3.5 w-3.5" style="color: var(--emerald);" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" />
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-foreground">Running inference…</p>
+            <p id="processing-sub" class="font-mono text-xs text-muted-foreground"></p>
+          </div>
+        </div>
+
+        <!-- KPI hero row -->
+        <div id="kpi-hero" class="grid grid-cols-1 gap-4 lg:grid-cols-4"></div>
+
+        <!-- Simulation deck -->
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <!-- LEFT: Levers -->
+          <section class="glass-card rounded-2xl p-6">
+            <header class="mb-5 flex items-center gap-2">
+              <svg class="h-4 w-4" style="color: var(--neon);" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="4" x2="4" y1="21" y2="14" /><line x1="4" x2="4" y1="10" y2="3" /><line x1="12" x2="12" y1="21" y2="12" /><line x1="12" x2="12" y1="8" y2="3" /><line x1="20" x2="20" y1="21" y2="16" /><line x1="20" x2="20" y1="12" y2="3" /><line x1="2" x2="6" y1="14" y2="14" /><line x1="10" x2="14" y1="8" y2="8" /><line x1="18" x2="22" y1="16" y2="16" />
+              </svg>
+              <h2 class="text-sm font-semibold tracking-wide text-foreground">
+                Global Macro Behavioral Levers
+              </h2>
+            </header>
+            <div id="levers" class="flex flex-col gap-6"></div>
+          </section>
+
+          <!-- RIGHT: Class drift + feature importance -->
+          <section class="glass-card rounded-2xl p-6">
+            <header class="mb-5 flex items-center gap-2">
+              <svg class="h-4 w-4" style="color: var(--emerald);" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 14v6M9 21h6M17 8h.01M12 2 4 14h16L12 2Z" /><path d="M8 14 12 8l4 6" />
+              </svg>
+              <h2 class="text-sm font-semibold tracking-wide text-foreground">
+                Random Forest Live Class Drift
+              </h2>
+            </header>
+
+            <div
+              class="mb-2 flex items-center justify-between text-xs text-muted-foreground"
+            >
+              <span>Population distribution shift</span>
+              <span id="drift-n" class="font-mono"></span>
+            </div>
+            <div
+              id="drift-bar"
+              class="flex h-9 w-full overflow-hidden rounded-lg"
+              style="border: 1px solid oklch(1 0 0 / 10%);"
+            ></div>
+            <div id="drift-legend" class="mt-3 flex flex-wrap gap-4"></div>
+
+            <div class="mt-6">
+              <h3
+                class="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              >
+                Model Feature Importance Priorities
+              </h3>
+              <div id="feature-importance" class="flex flex-col gap-3"></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Retention ledger -->
+        <section class="glass-card overflow-hidden rounded-2xl">
+          <header
+            class="flex items-center gap-2 border-b px-6 py-4"
+            style="border-color: oklch(1 0 0 / 10%);"
+          >
+            <svg class="h-4 w-4" style="color: var(--amber);" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8" />
+            </svg>
+            <h2 class="text-sm font-semibold tracking-wide text-foreground">
+              Priority Action Items: High-Value Defections
+            </h2>
+            <span
+              class="ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium"
+              style="background: oklch(0.82 0.15 80 / 12%); color: var(--amber);"
+            >
+              Class 1 · At Risk
+            </span>
+          </header>
+
+          <div class="overflow-x-auto">
+            <table class="w-full min-w-[720px] text-left">
+              <thead>
+                <tr
+                  class="text-xs uppercase tracking-wider text-muted-foreground"
+                >
+                  <th class="px-6 py-3 font-medium">Customer ID</th>
+                  <th class="px-6 py-3 font-medium">
+                    <button type="button" data-sort="lifecycleRatio" class="sort-btn inline-flex items-center gap-1 transition-colors hover:text-foreground">
+                      Lifecycle Ratio
+                      <svg class="h-3 w-3 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4M17 20V4M3 8l4-4 4 4M7 4v16"/></svg>
+                    </button>
+                  </th>
+                  <th class="px-6 py-3 font-medium">
+                    <button type="button" data-sort="monthlySpendRate" class="sort-btn inline-flex items-center gap-1 transition-colors hover:text-foreground">
+                      Monthly Spend Rate
+                      <svg class="h-3 w-3 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4M17 20V4M3 8l4-4 4 4M7 4v16"/></svg>
+                    </button>
+                  </th>
+                  <th class="px-6 py-3 font-medium">Current Health Tag</th>
+                  <th class="px-6 py-3 font-medium">AI Action Strategy</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <footer
+        class="mt-8 flex items-center justify-between border-t pt-4 text-xs text-muted-foreground"
+        style="border-color: oklch(1 0 0 / 5%);"
+      >
+        <span>Structured for direct FastAPI model binding · /api/predict</span>
+        <span id="footer-state" class="font-mono"></span>
+      </footer>
+    </main>
+
+    <script>
+      'use strict';
+
+      /* =========================================================
+       * 1. Core data model + feature engineering + mock Random Forest
+       * ======================================================= */
+
+      const DEFAULT_LEVERS = {
+        interactionDelay: 0,
+        usageVelocity: 1,
+        frictionDelay: 0,
+        walletShare: 1,
+      };
+
+      function mulberry32(seed) {
+        return function () {
+          seed |= 0;
+          seed = (seed + 0x6d2b79f5) | 0;
+          let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const SUBS = ['Basic', 'Standard', 'Premium'];
+      const CONTRACTS = ['Monthly', 'Quarterly', 'Annual'];
+
+      function generateCustomers(count = 140) {
+        const rand = mulberry32(20260709);
+        const out = [];
+        for (let i = 0; i < count; i++) {
+          const sub = SUBS[Math.floor(rand() * SUBS.length)];
+          const spendBase = sub === 'Premium' ? 900 : sub === 'Standard' ? 480 : 220;
+          out.push({
+            id: 'CX-' + (10234 + i).toString(),
+            age: 20 + Math.floor(rand() * 45),
+            gender: rand() > 0.5 ? 'Male' : 'Female',
+            tenure: 1 + Math.floor(rand() * 60),
+            usageFrequency: 1 + Math.floor(rand() * 30),
+            subscriptionType: sub,
+            contractLength: CONTRACTS[Math.floor(rand() * CONTRACTS.length)],
+            totalSpend: Math.round(spendBase + rand() * spendBase * 1.6),
+            lastInteraction: Math.floor(rand() * 30),
+            paymentDelay: Math.floor(rand() * 20),
+          });
+        }
+        return out;
+      }
+
+      function classify(score) {
+        if (score < 0.4) return 0;
+        if (score < 0.68) return 1;
+        return 2;
+      }
+
+      function engineer(base, levers = DEFAULT_LEVERS) {
+        const lastInteraction = Math.max(0, base.lastInteraction + levers.interactionDelay);
+        const usageFrequency = Math.max(0.1, base.usageFrequency * levers.usageVelocity);
+        const paymentDelay = Math.max(0, base.paymentDelay + levers.frictionDelay);
+        const totalSpend = Math.max(1, base.totalSpend * levers.walletShare);
+
+        const monthlySpendRate = totalSpend / (base.tenure + 1);
+        const interactionToUsageRatio = usageFrequency / (lastInteraction + 1);
+        const lifecycleRatio = base.tenure / (base.age + 1);
+        const spendPerInteraction = totalSpend / (usageFrequency + 1);
+
+        const interactionRisk = Math.min(1, lastInteraction / 45) * 0.34;
+        const usageRisk = Math.min(1, 1 / (interactionToUsageRatio + 0.3)) * 0.26;
+        const paymentRisk = Math.min(1, paymentDelay / 25) * 0.22;
+        const spendRisk = Math.min(1, 1 / (monthlySpendRate / 30 + 0.4)) * 0.18;
+
+        const riskScore = Math.min(1, interactionRisk + usageRisk + paymentRisk + spendRisk);
+
+        return Object.assign({}, base, {
+          lastInteraction,
+          usageFrequency,
+          paymentDelay,
+          totalSpend,
+          monthlySpendRate,
+          interactionToUsageRatio,
+          lifecycleRatio,
+          spendPerInteraction,
+          riskScore,
+          churnClass: classify(riskScore),
+        });
+      }
+
+      function strategyFor(c, levers) {
+        const interactionSignal = c.lastInteraction + Math.max(0, levers.interactionDelay);
+        const paymentSignal = c.paymentDelay;
+        const spendSignal = c.spendPerInteraction;
+        if (paymentSignal >= 12) return 'Billing Grace Period Outreach';
+        if (interactionSignal >= 18) return 'Trigger App Push Engagement';
+        if (spendSignal >= 60) return 'Issue Value Credits';
+        return 'Trigger App Push Engagement';
+      }
+
+      function summarize(base, levers) {
+        const engineered = base.map((c) => engineer(c, levers));
+
+        let safeMrr = 0;
+        let atRiskMrr = 0;
+        let churnLoss = 0;
+        const counts = { class0: 0, class1: 0, class2: 0 };
+
+        for (const c of engineered) {
+          if (c.churnClass === 0) {
+            safeMrr += c.monthlySpendRate;
+            counts.class0++;
+          } else if (c.churnClass === 1) {
+            atRiskMrr += c.monthlySpendRate;
+            counts.class1++;
+          } else {
+            churnLoss += c.monthlySpendRate;
+            counts.class2++;
+          }
+        }
+
+        const total = engineered.length || 1;
+        const distribution = {
+          class0: (counts.class0 / total) * 100,
+          class1: (counts.class1 / total) * 100,
+          class2: (counts.class2 / total) * 100,
+        };
+
+        const totalMrr = safeMrr + atRiskMrr + churnLoss || 1;
+        const protectedPct = (safeMrr / totalMrr) * 100;
+
+        const agg = { interaction: 0, usage: 0, payment: 0, spend: 0 };
+        for (const c of engineered) {
+          agg.interaction += Math.min(1, c.lastInteraction / 45);
+          agg.usage += Math.min(1, 1 / (c.interactionToUsageRatio + 0.3));
+          agg.payment += Math.min(1, c.paymentDelay / 25);
+          agg.spend += Math.min(1, 1 / (c.monthlySpendRate / 30 + 0.4));
+        }
+        const rawWeights = [
+          { label: 'Interaction_To_Usage_Ratio', weight: agg.interaction * 0.34 },
+          { label: 'Usage Velocity Signal', weight: agg.usage * 0.26 },
+          { label: 'Spend_Per_Interaction', weight: agg.payment * 0.22 },
+          { label: 'Monthly_Spend_Rate', weight: agg.spend * 0.18 },
+        ];
+        const sum = rawWeights.reduce((s, w) => s + w.weight, 0) || 1;
+        const featureImportance = rawWeights
+          .map((w) => ({ label: w.label, weight: (w.weight / sum) * 100 }))
+          .sort((a, b) => b.weight - a.weight);
+
+        const actionItems = engineered
+          .filter((c) => c.churnClass === 1)
+          .sort((a, b) => b.totalSpend - a.totalSpend)
+          .slice(0, 5);
+
+        return {
+          safeMrr: safeMrr * 30,
+          atRiskMrr: atRiskMrr * 30,
+          churnLoss: churnLoss * 30,
+          protectedPct,
+          distribution,
+          counts,
+          featureImportance,
+          actionItems,
+        };
+      }
+
+      function formatUsd(n) {
+        return n.toLocaleString('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          maximumFractionDigits: 0,
+        });
+      }
+
+      /* =========================================================
+       * 2. State management
+       * ======================================================= */
+
+      const CUSTOMERS = generateCustomers();
+      const BASELINE = summarize(CUSTOMERS, DEFAULT_LEVERS);
+
+      const state = {
+        levers: Object.assign({}, DEFAULT_LEVERS),
+        phase: 'initial', // 'initial' | 'processing' | 'simulated'
+        committed: summarize(CUSTOMERS, DEFAULT_LEVERS),
+        sortKey: 'monthlySpendRate',
+        asc: false,
+      };
+
+      function isDirty() {
+        return JSON.stringify(state.levers) !== JSON.stringify(DEFAULT_LEVERS);
+      }
+
+      function currentSummary() {
+        return state.phase === 'simulated'
+          ? state.committed
+          : summarize(CUSTOMERS, state.levers);
+      }
+
+      /* =========================================================
+       * 3. Icons (inline SVG strings)
+       * ======================================================= */
+
+      const ICONS = {
+        shield:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
+        triangle:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+        trendDown:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>',
+        arrowUpRight:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>',
+        arrowDownRight:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10"/><path d="M17 7v10H7"/></svg>',
+        activity:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+        zap:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+        gauge:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>',
+        wallet:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>',
+      };
+
+      /* =========================================================
+       * 4. Lever configuration
+       * ======================================================= */
+
+      const LEVERS = [
+        {
+          key: 'interactionDelay',
+          label: 'Interaction Delay Window',
+          min: -30,
+          max: 30,
+          step: 1,
+          suffix: (v) => (v > 0 ? '+' : '') + v + ' d',
+          accent: 'var(--neon)',
+          icon: ICONS.activity,
+        },
+        {
+          key: 'usageVelocity',
+          label: 'Usage Velocity Multiplier',
+          min: 0.5,
+          max: 2,
+          step: 0.1,
+          suffix: (v) => v.toFixed(1) + 'x',
+          accent: 'var(--emerald)',
+          icon: ICONS.zap,
+        },
+        {
+          key: 'frictionDelay',
+          label: 'Friction / Payment Delays',
+          min: -15,
+          max: 15,
+          step: 1,
+          suffix: (v) => (v > 0 ? '+' : '') + v + ' d',
+          accent: 'var(--crimson)',
+          icon: ICONS.gauge,
+        },
+        {
+          key: 'walletShare',
+          label: 'Wallet Share / Monthly Spend',
+          min: 0.5,
+          max: 2,
+          step: 0.1,
+          suffix: (v) => v.toFixed(1) + 'x',
+          accent: 'var(--amber)',
+          icon: ICONS.wallet,
+        },
+      ];
+
+      const CLASS_META = [
+        { key: 'class0', label: 'Healthy', color: 'var(--emerald)' },
+        { key: 'class1', label: 'At Risk', color: 'var(--amber)' },
+        { key: 'class2', label: 'Churned', color: 'var(--crimson)' },
+      ];
+
+      const KPI_CARDS = [
+        {
+          label: 'Safe Portfolio MRR (Class 0)',
+          field: 'safeMrr',
+          accent: 'emerald',
+          icon: ICONS.shield,
+          lowerIsBetter: false,
+        },
+        {
+          label: 'At-Risk MRR Corridor (Class 1)',
+          field: 'atRiskMrr',
+          accent: 'amber',
+          icon: ICONS.triangle,
+          lowerIsBetter: true,
+        },
+        {
+          label: 'Realized Churn Loss (Class 2)',
+          field: 'churnLoss',
+          accent: 'crimson',
+          icon: ICONS.trendDown,
+          lowerIsBetter: true,
+        },
+      ];
+
+      const BADGE_STYLE = {
+        'Trigger App Push Engagement':
+          'background: oklch(0.78 0.14 210 / 12%); color: var(--neon); box-shadow: inset 0 0 0 1px oklch(0.78 0.14 210 / 30%);',
+        'Issue Value Credits':
+          'background: oklch(0.6 0.18 290 / 15%); color: oklch(0.78 0.14 290); box-shadow: inset 0 0 0 1px oklch(0.6 0.18 290 / 30%);',
+        'Billing Grace Period Outreach':
+          'background: oklch(0.82 0.15 80 / 12%); color: var(--amber); box-shadow: inset 0 0 0 1px oklch(0.82 0.15 80 / 30%);',
+      };
+
+      /* =========================================================
+       * 5. Rendering
+       * ======================================================= */
+
+      function renderProgressRing(value) {
+        const size = 132;
+        const stroke = 12;
+        const radius = (size - stroke) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const clamped = Math.max(0, Math.min(100, value));
+        const offset = circumference - (clamped / 100) * circumference;
+
+        return (
+          '<div class="relative grid place-items-center" style="width:' + size + 'px;height:' + size + 'px" role="img" aria-label="Total protected revenue ' + clamped.toFixed(1) + ' percent">' +
+            '<svg width="' + size + '" height="' + size + '" class="-rotate-90">' +
+              '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + radius + '" fill="none" stroke="oklch(0.4 0.03 250 / 35%)" stroke-width="' + stroke + '"></circle>' +
+              '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + radius + '" fill="none" stroke="var(--emerald)" stroke-width="' + stroke + '" stroke-linecap="round" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '" style="transition: stroke-dashoffset 0.8s cubic-bezier(0.22,1,0.36,1); filter: drop-shadow(0 0 6px oklch(0.75 0.16 160 / 55%));"></circle>' +
+            '</svg>' +
+            '<div class="absolute flex flex-col items-center">' +
+              '<span class="font-mono text-2xl font-semibold tabular-nums text-foreground">' + clamped.toFixed(1) + '%</span>' +
+              '<span class="text-[10px] uppercase tracking-widest text-muted-foreground">Protected</span>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      function renderKpiHero() {
+        const current = currentSummary();
+        const container = document.getElementById('kpi-hero');
+        let html = '';
+
+        for (const card of KPI_CARDS) {
+          const value = current[card.field];
+          const baselineValue = BASELINE[card.field];
+          const delta = value - baselineValue;
+          const pct = baselineValue !== 0 ? (delta / baselineValue) * 100 : 0;
+          const improved = card.lowerIsBetter ? delta <= 0 : delta >= 0;
+          const accentVar = 'var(--' + card.accent + ')';
+          const deltaStyle = improved
+            ? 'background: oklch(0.75 0.16 160 / 12%); color: var(--emerald);'
+            : 'background: oklch(0.66 0.22 18 / 12%); color: var(--crimson);';
+
+          html +=
+            '<div class="glass-card group relative overflow-hidden rounded-2xl p-5 transition-transform duration-300 hover:-translate-y-0.5 ring-' + card.accent + '">' +
+              '<div class="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-20 blur-2xl" style="background:' + accentVar + '" aria-hidden="true"></div>' +
+              '<div class="flex items-start justify-between">' +
+                '<div class="flex items-center gap-2">' +
+                  '<span class="grid h-9 w-9 place-items-center rounded-lg" style="background: oklch(1 0 0 / 5%); color:' + accentVar + '">' + card.icon + '</span>' +
+                  '<span class="max-w-[9rem] text-xs font-medium leading-tight text-muted-foreground text-balance">' + card.label + '</span>' +
+                '</div>' +
+                '<span class="inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs font-semibold tabular-nums" style="' + deltaStyle + '">' +
+                  (improved ? ICONS.arrowUpRight : ICONS.arrowDownRight) + Math.abs(pct).toFixed(1) + '%' +
+                '</span>' +
+              '</div>' +
+              '<div class="mt-5">' +
+                '<p class="font-mono text-3xl font-semibold tabular-nums tracking-tight" style="color:' + accentVar + '">' + formatUsd(value) + '</p>' +
+                '<p class="mt-1 font-mono text-xs tabular-nums text-muted-foreground">baseline ' + formatUsd(baselineValue) + '</p>' +
+              '</div>' +
+            '</div>';
+        }
+
+        html +=
+          '<div class="glass-card flex flex-col items-center justify-center gap-2 rounded-2xl p-5">' +
+            renderProgressRing(current.protectedPct) +
+            '<span class="text-center text-xs font-medium text-muted-foreground text-balance">Total Protected Revenue %</span>' +
+          '</div>';
+
+        container.innerHTML = html;
+      }
+
+      function leverTrack(config, value) {
+        const pct = ((value - config.min) / (config.max - config.min)) * 100;
+        return (
+          'linear-gradient(to right, ' + config.accent + ' 0%, ' + config.accent + ' ' + pct + '%, oklch(0.4 0.03 250 / 35%) ' + pct + '%, oklch(0.4 0.03 250 / 35%) 100%)'
+        );
+      }
+
+      function renderLevers() {
+        const container = document.getElementById('levers');
+        let html = '';
+        for (const c of LEVERS) {
+          const value = state.levers[c.key];
+          html +=
+            '<div>' +
+              '<div class="mb-2 flex items-center justify-between">' +
+                '<div class="flex items-center gap-2">' +
+                  '<span class="grid h-7 w-7 place-items-center rounded-md" style="background: oklch(1 0 0 / 5%); color:' + c.accent + '">' + c.icon + '</span>' +
+                  '<span class="text-sm font-medium" style="color: oklch(0.96 0.01 240 / 90%)">' + c.label + '</span>' +
+                '</div>' +
+                '<span class="lever-badge rounded-md px-2 py-0.5 font-mono text-xs font-semibold tabular-nums" data-badge="' + c.key + '" style="border: 1px solid oklch(1 0 0 / 10%); background: oklch(1 0 0 / 5%); color:' + c.accent + '">' + c.suffix(value) + '</span>' +
+              '</div>' +
+              '<input type="range" class="lever" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '" value="' + value + '" aria-label="' + c.label + '" data-key="' + c.key + '" style="--slider-accent:' + c.accent + '; background:' + leverTrack(c, value) + '" />' +
+            '</div>';
+        }
+        container.innerHTML = html;
+
+        container.querySelectorAll('input[type=range]').forEach((el) => {
+          el.addEventListener('input', (e) => {
+            const key = e.target.getAttribute('data-key');
+            const config = LEVERS.find((l) => l.key === key);
+            const value = Number(e.target.value);
+            state.levers[key] = value;
+            // Update this slider's track + badge inline (keeps drag focus).
+            e.target.style.background = leverTrack(config, value);
+            const badge = container.querySelector('[data-badge="' + key + '"]');
+            if (badge) badge.textContent = config.suffix(value);
+            // Editing levers invalidates a committed run -> live preview mode.
+            if (state.phase === 'simulated') state.phase = 'initial';
+            renderAll();
+          });
+        });
+      }
+
+      function renderClassDrift() {
+        const summary = currentSummary();
+        const { distribution, counts } = summary;
+        const n = counts.class0 + counts.class1 + counts.class2;
+        document.getElementById('drift-n').textContent = 'n = ' + n;
+
+        let barHtml = '';
+        for (const c of CLASS_META) {
+          const w = distribution[c.key];
+          barHtml +=
+            '<div class="flex items-center justify-center transition-[width] duration-700 ease-out" style="width:' + w + '%; background:' + c.color + '; min-width:' + (w > 0 ? 2 : 0) + 'px">' +
+              (w > 9 ? '<span class="font-mono text-xs font-semibold" style="color:#090d16">' + w.toFixed(0) + '%</span>' : '') +
+            '</div>';
+        }
+        document.getElementById('drift-bar').innerHTML = barHtml;
+
+        let legendHtml = '';
+        for (const c of CLASS_META) {
+          legendHtml +=
+            '<div class="flex items-center gap-1.5">' +
+              '<span class="h-2.5 w-2.5 rounded-full" style="background:' + c.color + '"></span>' +
+              '<span class="text-xs text-muted-foreground">' + c.label +
+                '<span class="ml-1 font-mono" style="color: oklch(0.96 0.01 240 / 80%)">' + counts[c.key] + '</span>' +
+              '</span>' +
+            '</div>';
+        }
+        document.getElementById('drift-legend').innerHTML = legendHtml;
+
+        let fiHtml = '';
+        for (const f of summary.featureImportance) {
+          fiHtml +=
+            '<div>' +
+              '<div class="mb-1 flex items-center justify-between">' +
+                '<span class="font-mono text-xs" style="color: oklch(0.96 0.01 240 / 80%)">' + f.label + '</span>' +
+                '<span class="font-mono text-xs tabular-nums text-muted-foreground">' + f.weight.toFixed(1) + '%</span>' +
+              '</div>' +
+              '<div class="h-2 w-full overflow-hidden rounded-full" style="background: oklch(1 0 0 / 5%)">' +
+                '<div class="h-full rounded-full transition-[width] duration-700 ease-out" style="width:' + f.weight + '%; background: var(--neon); box-shadow: 0 0 10px -1px var(--neon)"></div>' +
+              '</div>' +
+            '</div>';
+        }
+        document.getElementById('feature-importance').innerHTML = fiHtml;
+      }
+
+      function renderLedger() {
+        const summary = currentSummary();
+        const rows = summary.actionItems.map((c) => engineer(c, state.levers));
+        rows.sort((a, b) =>
+          state.asc
+            ? a[state.sortKey] - b[state.sortKey]
+            : b[state.sortKey] - a[state.sortKey]
+        );
+
+        const body = document.getElementById('ledger-body');
+        if (rows.length === 0) {
+          body.innerHTML =
+            '<tr><td colspan="5" class="px-6 py-10 text-center text-sm text-muted-foreground">No Class 1 customers under current lever configuration.</td></tr>';
+          return;
+        }
+
+        let html = '';
+        for (const c of rows) {
+          const strategy = strategyFor(c, state.levers);
+          html +=
+            '<tr class="transition-colors" style="border-top: 1px solid oklch(1 0 0 / 5%)" onmouseover="this.style.background=\'oklch(1 0 0 / 3%)\'" onmouseout="this.style.background=\'transparent\'">' +
+              '<td class="px-6 py-4"><span class="font-mono text-sm font-medium text-foreground">' + c.id + '</span><span class="ml-2 text-xs text-muted-foreground">' + c.subscriptionType + '</span></td>' +
+              '<td class="px-6 py-4 font-mono text-sm tabular-nums" style="color: oklch(0.96 0.01 240 / 80%)">' + c.lifecycleRatio.toFixed(3) + '</td>' +
+              '<td class="px-6 py-4 font-mono text-sm tabular-nums" style="color: oklch(0.96 0.01 240 / 80%)">' + formatUsd(c.monthlySpendRate) + '</td>' +
+              '<td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style="background: oklch(0.82 0.15 80 / 12%); color: var(--amber)"><span class="h-1.5 w-1.5 rounded-full" style="background: var(--amber)"></span>At Risk · ' + (c.riskScore * 100).toFixed(0) + '</span></td>' +
+              '<td class="px-6 py-4"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" style="' + BADGE_STYLE[strategy] + '">' + strategy + '</span></td>' +
+            '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      function renderChrome() {
+        const dot = document.getElementById('status-dot');
+        dot.className =
+          'h-1.5 w-1.5 rounded-full ' +
+          (state.phase === 'processing' ? 'animate-pulse' : '');
+        dot.style.background =
+          state.phase === 'processing'
+            ? 'var(--amber)'
+            : state.phase === 'simulated'
+            ? 'var(--emerald)'
+            : 'var(--neon)';
+
+        const resetBtn = document.getElementById('reset-btn');
+        if (state.phase === 'simulated' || isDirty()) {
+          resetBtn.classList.remove('hidden');
+          resetBtn.classList.add('inline-flex');
+        } else {
+          resetBtn.classList.add('hidden');
+          resetBtn.classList.remove('inline-flex');
+        }
+
+        const simBtn = document.getElementById('simulate-btn');
+        const simContent = document.getElementById('simulate-btn-content');
+        simBtn.disabled = state.phase === 'processing';
+        if (state.phase === 'processing') {
+          simContent.innerHTML =
+            '<svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Calculating…';
+        } else {
+          simContent.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>Simulate Impact';
+        }
+
+        const overlay = document.getElementById('processing-overlay');
+        if (state.phase === 'processing') {
+          overlay.classList.remove('hidden');
+          overlay.classList.add('grid');
+          document.getElementById('processing-sub').textContent =
+            'random_forest_v3 · scoring ' + CUSTOMERS.length + ' records';
+        } else {
+          overlay.classList.add('hidden');
+          overlay.classList.remove('grid');
+        }
+
+        document.getElementById('footer-state').textContent =
+          state.phase === 'simulated'
+            ? 'SIMULATED STATE'
+            : isDirty()
+            ? 'PENDING RUN'
+            : 'BASELINE STATE';
+      }
+
+      function renderAll() {
+        renderKpiHero();
+        renderClassDrift();
+        renderLedger();
+        renderChrome();
+      }
+
+      /* =========================================================
+       * 6. Actions + wiring
+       * ======================================================= */
+
+      function simulate() {
+        state.phase = 'processing';
+        renderChrome();
+        // Mock model inference latency (mirrors the /api/predict round trip).
+        setTimeout(() => {
+          state.committed = summarize(CUSTOMERS, state.levers);
+          state.phase = 'simulated';
+          renderAll();
+        }, 1100);
+      }
+
+      function reset() {
+        state.levers = Object.assign({}, DEFAULT_LEVERS);
+        state.committed = BASELINE;
+        state.phase = 'initial';
+        renderLevers();
+        renderAll();
+      }
+
+      document.getElementById('simulate-btn').addEventListener('click', simulate);
+      document.getElementById('reset-btn').addEventListener('click', reset);
+
+      document.querySelectorAll('.sort-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-sort');
+          if (key === state.sortKey) state.asc = !state.asc;
+          else {
+            state.sortKey = key;
+            state.asc = false;
+          }
+          renderLedger();
+        });
+      });
+
+      // Initial paint
+      renderLevers();
+      renderAll();
+    </script>
+  </body>
+</html>
