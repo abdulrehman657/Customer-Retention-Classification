@@ -2,16 +2,10 @@
 Customer Health Checker - Streamlit front end wired to the trained
 random_forest_health_model.pkl (see Model-Training.py).
 
-Redesigned around a single idea: pick one real customer, look at the AI's
-verdict on them, adjust their info with plain sliders in real units (age in
-years, spend in dollars - no multipliers), and watch the verdict update live.
-
-An earlier version of this app simulated an entire 140-customer population
-being shifted at once with abstract "1.3x" style multipliers. That produced
-technically-correct but genuinely confusing results (aggregate dollar totals
-moving in non-monotonic, hard-to-explain ways as the whole population moved
-together). One real customer with real units is a much simpler mental model
-and sidesteps that confusion entirely.
+Read-only viewer: pick a random real customer and see the AI's verdict on
+them - Healthy, At Risk, or Churned - with a confidence score and the real
+data behind it. No editable controls; this is purely for looking at what
+the model sees, not for simulating hypothetical customers.
 """
 
 import math
@@ -312,33 +306,21 @@ def predict_customer(values: dict) -> dict:
 
 
 # =========================================================
-# 4. Session state - which customer is loaded, editable field values
+# 4. Session state - which customer is currently shown
 # =========================================================
 
 FIELD_KEYS = [c["key"] for c in FIELD_CONFIG] + ["Age", "Gender", "Subscription Type", "Contract Length"]
 
-
-def load_customer_into_state(customer_id: str):
-    row = population.loc[population["CustomerID"] == customer_id].iloc[0]
-    for key in FIELD_KEYS:
-        st.session_state[f"field_{key}"] = row[key].item() if hasattr(row[key], "item") else row[key]
-    st.session_state.active_customer_id = customer_id
-
-
 if "active_customer_id" not in st.session_state:
-    load_customer_into_state(population.iloc[0]["CustomerID"])
+    st.session_state.active_customer_id = population.iloc[0]["CustomerID"]
 
 
 def pick_random_customer():
-    new_id = random.choice(population["CustomerID"].tolist())
-    load_customer_into_state(new_id)
+    st.session_state.active_customer_id = random.choice(population["CustomerID"].tolist())
 
 
-def reset_current_customer():
-    load_customer_into_state(st.session_state.active_customer_id)
-
-
-current_values = {key: st.session_state[f"field_{key}"] for key in FIELD_KEYS}
+active_row = population.loc[population["CustomerID"] == st.session_state.active_customer_id].iloc[0]
+current_values = {key: (active_row[key].item() if hasattr(active_row[key], "item") else active_row[key]) for key in FIELD_KEYS}
 result = predict_customer(current_values)
 meta = CLASS_META[result["pred"]]
 
@@ -381,19 +363,6 @@ html, body, [class*="css"] { font-family: 'Geist', ui-sans-serif, system-ui, san
   to { opacity: 1; transform: translateY(0); }
 }
 .glass-card, .verdict-card, .header-wrap { animation: fadeUp 0.35s ease-out; }
-
-/* st.container(border=True) is used for the two field-grouping cards below
-   because they mix custom HTML captions with real interactive widgets -
-   a hand-written <div> can't wrap widgets rendered in separate st.* calls,
-   but a real Streamlit container can. Reskinned here to match .glass-card. */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-  background: linear-gradient(160deg, oklch(0.26 0.03 250 / 55%), oklch(0.16 0.03 250 / 45%));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--glass-border) !important;
-  border-radius: 1.1rem !important;
-  box-shadow: 0 12px 32px -18px oklch(0 0 0 / 60%);
-}
 
 .glass-card {
   background: linear-gradient(160deg, oklch(0.26 0.03 250 / 55%), oklch(0.16 0.03 250 / 45%));
@@ -474,13 +443,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 }
 .field-caption { font-size: 0.76rem; color: var(--muted-foreground); margin: 0.15rem 0 0.9rem 2.35rem; line-height:1.4; }
 .field-caption.warn { color: var(--amber); }
-div[data-testid="stSlider"] { padding-top: 0.15rem; }
-
-div[data-baseweb="select"] > div {
-  background: oklch(1 0 0 / 5%) !important;
-  border-radius: 0.6rem !important;
-  border-color: oklch(1 0 0 / 12%) !important;
-}
 
 /* ---------- Feature importance ---------- */
 .fi-row { margin-bottom:0.9rem; }
@@ -527,8 +489,8 @@ st.markdown(
       <div class="header-badge">{ICONS['cpu']}</div>
       <div class="header-title">Customer Health Checker</div>
       <p class="intro-text">This runs a real trained AI model (a Random Forest) - not a mockup.
-      Pick a real customer below, adjust their info, and watch the AI's verdict update instantly,
-      using its actual trained logic.</p>
+      Browse real customers from the dataset below and see exactly how the AI reads
+      each one - Healthy, At Risk, or Churned.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -540,15 +502,11 @@ st.write("")
 # 7. Customer picker
 # =========================================================
 
-pick_col, reset_col = st.columns(2)
-with pick_col:
-    st.button("🎲  Load A Random Real Customer", on_click=pick_random_customer, use_container_width=True, type="primary")
-with reset_col:
-    st.button("↺  Undo My Changes", on_click=reset_current_customer, use_container_width=True)
+st.button("🎲  Show Me Another Real Customer", on_click=pick_random_customer, use_container_width=True, type="primary")
 
 st.markdown(
     f'<div class="picker-caption">Showing real customer '
-    f'<span class="id-chip">{st.session_state.active_customer_id}</span> from the dataset - tweak anything below.</div>',
+    f'<span class="id-chip">{st.session_state.active_customer_id}</span> from the dataset.</div>',
     unsafe_allow_html=True,
 )
 
@@ -597,39 +555,26 @@ st.write("")
 st.write("")
 
 # =========================================================
-# 9. Editable customer info (plain sliders, real units)
+# 9. Customer info - read-only, no editable controls
 # =========================================================
 
 st.markdown(
     f'<div class="card-title"><span class="icon-chip" style="color:var(--neon)">{ICONS["user"]}</span>Who They Are</div>',
     unsafe_allow_html=True,
 )
-with st.container(border=True):
-    age_col, gender_col = st.columns(2)
-    with age_col:
-        st.slider("Age", min_value=18, max_value=65, step=1, key="field_Age")
-    with gender_col:
-        st.selectbox(
-            "Gender",
-            options=list(GENDER_MAP.keys()),
-            format_func=lambda k: GENDER_MAP[k],
-            key="field_Gender",
-        )
-    plan_col, contract_col = st.columns(2)
-    with plan_col:
-        st.selectbox(
-            "Plan",
-            options=list(SUBSCRIPTION_MAP.keys()),
-            format_func=lambda k: SUBSCRIPTION_MAP[k],
-            key="field_Subscription Type",
-        )
-    with contract_col:
-        st.selectbox(
-            "Contract Length",
-            options=list(CONTRACT_MAP.keys()),
-            format_func=lambda k: CONTRACT_MAP[k],
-            key="field_Contract Length",
-        )
+who_rows = [
+    ("Age", str(current_values["Age"])),
+    ("Gender", GENDER_MAP[current_values["Gender"]]),
+    ("Plan", SUBSCRIPTION_MAP[current_values["Subscription Type"]]),
+    ("Contract Length", CONTRACT_MAP[current_values["Contract Length"]]),
+]
+who_html = "".join(
+    f'<div class="field-row" style="margin-top:{"0" if i == 0 else "0.9rem"};">'
+    f'<span class="field-label">{label}</span>'
+    f'<span class="field-value-badge">{value}</span></div>'
+    for i, (label, value) in enumerate(who_rows)
+)
+st.markdown(f'<div class="glass-card">{who_html}</div>', unsafe_allow_html=True)
 
 st.write("")
 
@@ -637,29 +582,21 @@ st.markdown(
     f'<div class="card-title"><span class="icon-chip" style="color:var(--emerald)">{ICONS["activity"]}</span>How They Behave</div>',
     unsafe_allow_html=True,
 )
-with st.container(border=True):
-    for i, cfg in enumerate(FIELD_CONFIG):
-        value = st.session_state[f"field_{cfg['key']}"]
-        shown = f"{cfg.get('prefix', '')}{value:,.0f}{cfg['suffix']}"
-        st.markdown(
-            f'<div class="field-row" style="margin-top:{"0" if i == 0 else "1.1rem"};">'
-            f'<div class="field-label-group">'
-            f'<span class="field-icon-chip" style="color:{cfg["accent"]}">{ICONS[cfg["icon"]]}</span>'
-            f'<span class="field-label">{cfg["label"]}</span></div>'
-            f'<span class="field-value-badge" style="color:{cfg["accent"]}">{shown}</span>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-        st.slider(
-            cfg["label"],
-            min_value=cfg["min"],
-            max_value=cfg["max"],
-            step=cfg["step"],
-            key=f"field_{cfg['key']}",
-            label_visibility="collapsed",
-        )
-        warn_class = " warn" if cfg["key"] == "Payment Delay" else ""
-        st.markdown(f'<div class="field-caption{warn_class}">{cfg["help"]}</div>', unsafe_allow_html=True)
+behave_html = ""
+for i, cfg in enumerate(FIELD_CONFIG):
+    value = current_values[cfg["key"]]
+    shown = f"{cfg.get('prefix', '')}{value:,.0f}{cfg['suffix']}"
+    warn_class = " warn" if cfg["key"] == "Payment Delay" else ""
+    behave_html += (
+        f'<div class="field-row" style="margin-top:{"0" if i == 0 else "1.1rem"};">'
+        f'<div class="field-label-group">'
+        f'<span class="field-icon-chip" style="color:{cfg["accent"]}">{ICONS[cfg["icon"]]}</span>'
+        f'<span class="field-label">{cfg["label"]}</span></div>'
+        f'<span class="field-value-badge" style="color:{cfg["accent"]}">{shown}</span>'
+        "</div>"
+        f'<div class="field-caption{warn_class}">{cfg["help"]}</div>'
+    )
+st.markdown(f'<div class="glass-card">{behave_html}</div>', unsafe_allow_html=True)
 
 st.write("")
 
